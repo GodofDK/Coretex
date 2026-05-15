@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CORETEX // SECURE NODE v2.5</title>
+<script type="module">
+// =====================================================================
+// FIREBASE SETUP — read these instructions before deploying
+// =====================================================================
+// 1. Go to https://console.firebase.google.com and create a free project
+// 2. Click "Add app" → Web, copy the firebaseConfig values below
+// 3. In Firebase → Firestore Database → Rules, paste and publish:
+//
+//      rules_version = '2';
+//      service cloud.firestore {
+//        match /databases/{database}/documents {
+//          match /{document=**} { allow read, write: if true; }
+//        }
+//      }
+//
+// 4. Replace the placeholder strings below with your real values
+// 5. All players on the same domain now share live state instantly
+// =====================================================================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, addDoc, getDocs, deleteDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL, listAll, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyBKfUhY0-nOZnMjOnaaCWh7LVUAf5S0dXw",
+  authDomain:        "chronicle-52210.firebaseapp.com",
+  projectId:         "chronicle-52210",
+  storageBucket:     "chronicle-52210.firebasestorage.app",
+  messagingSenderId: "990484708827",
+  appId:             "1:990484708827:web:5290c7ef67219a29e6bbfe",
+  measurementId:     "G-Z3SXMJEWTW"
+};
+
+const CONFIGURED = firebaseConfig.projectId !== "PASTE_YOUR_PROJECT_ID";
+let db = null;
+let storage = null;
+if(CONFIGURED) {
+  const app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+  storage = getStorage(app);
+}
+window.__firebase = { db, storage, doc, getDoc, setDoc, onSnapshot, collection, addDoc, getDocs, deleteDoc, query, orderBy, serverTimestamp, ref, uploadBytes, getDownloadURL, listAll, deleteObject, CONFIGURED };
+window.dispatchEvent(new Event('firebase-ready'));
+</script>
+<link rel="stylesheet" href="coretex.css">
+</head>
+<body>
+
+<!-- LOADING SCREEN -->
+<div id="loading-screen">
+  <div class="loading-logo-wrap">
+    <div class="loading-logo-ring-outer"></div>
+    <div class="loading-logo-inner">
+      <!-- Coretex hexagon logo -->
+      <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="cxGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#5bc8ff"/>
+            <stop offset="50%" stop-color="#4db8ff"/>
+            <stop offset="100%" stop-color="#2aa0f0"/>
+          </linearGradient>
+          <filter id="cxGlow">
+            <feGaussianBlur stdDeviation="2" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <!-- Outer hexagon -->
+        <polygon points="40,4 72,22 72,58 40,76 8,58 8,22" fill="none" stroke="url(#cxGrad)" stroke-width="2" opacity="0.9" filter="url(#cxGlow)"/>
+        <!-- Inner hexagon -->
+        <polygon points="40,14 62,27 62,53 40,66 18,53 18,27" fill="none" stroke="#4db8ff" stroke-width="1" opacity="0.4"/>
+        <!-- CX letters -->
+        <text x="40" y="48" text-anchor="middle" font-family="Rajdhani, sans-serif" font-weight="700" font-size="24" fill="url(#cxGrad)" letter-spacing="1" filter="url(#cxGlow)">CX</text>
+        <!-- Corner dots -->
+        <circle cx="40" cy="4"  r="2.5" fill="#5bc8ff" opacity="0.8"/>
+        <circle cx="72" cy="22" r="2.5" fill="#5bc8ff" opacity="0.8"/>
+        <circle cx="72" cy="58" r="2.5" fill="#5bc8ff" opacity="0.8"/>
+        <circle cx="40" cy="76" r="2.5" fill="#5bc8ff" opacity="0.8"/>
+        <circle cx="8"  cy="58" r="2.5" fill="#5bc8ff" opacity="0.8"/>
+        <circle cx="8"  cy="22" r="2.5" fill="#5bc8ff" opacity="0.8"/>
+      </svg>
+    </div>
+  </div>
+  <div class="loading-title">CORETEX</div>
+  <div class="loading-sub">// SECURE NODE — INITIALISING...</div>
+  <div class="loading-bar-track">
+    <div class="loading-bar-fill" id="loading-bar-fill"></div>
+  </div>
+  <div class="loading-status" id="loading-status">ESTABLISHING ENCRYPTED UPLINK...</div>
+</div>
+
+
+<!-- CAMERA GATE — shown after login for non-admin users -->
+<div id="cam-gate" style="display:none;position:fixed;inset:0;z-index:5000;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;gap:0;animation:flicker 8s infinite;">
+  <div style="width:480px;border:1px solid var(--border-bright);background:var(--bg2);box-shadow:0 0 80px rgba(30,100,180,0.3);position:relative;">
+    <div style="height:2px;background:linear-gradient(90deg,transparent,var(--cortex-accent),transparent);"></div>
+    <div style="background:rgba(0,20,35,0.95);border-bottom:1px solid var(--border-bright);padding:7px 14px;display:flex;align-items:center;justify-content:space-between;font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:3px;">
+      <span>CORETEX // BIOMETRISK VERIFIKATION</span>
+      <div style="display:flex;gap:6px;"><div style="width:8px;height:8px;border:1px solid var(--red);background:rgba(239,83,80,0.3);border-radius:1px;"></div><div style="width:8px;height:8px;border:1px solid var(--cortex-gold);border-radius:1px;"></div><div style="width:8px;height:8px;border:1px solid var(--cortex-accent);background:var(--cortex-accent);border-radius:1px;box-shadow:0 0 6px var(--cortex-accent);"></div></div>
+    </div>
+    <div style="padding:36px 40px 32px;">
+      <!-- Camera preview -->
+      <div style="width:100%;aspect-ratio:16/9;background:#000;border:1px solid var(--border-bright);margin-bottom:20px;position:relative;overflow:hidden;">
+        <video id="cam-gate-preview" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;display:block;"></video>
+        <div id="cam-gate-overlay" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(0,0,0,0.7);">
+          <div style="font-size:42px;opacity:0.5;">📷</div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:3px;text-transform:uppercase;">KAMERA IKKE AKTIVT</div>
+        </div>
+        <!-- Scan line animation when active -->
+        <div id="cam-gate-scanline" style="display:none;position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--cortex-accent),transparent);animation:reconnectScan 2s linear infinite;pointer-events:none;"></div>
+      </div>
+
+      <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:22px;color:var(--cortex-accent);letter-spacing:4px;text-transform:uppercase;margin-bottom:6px;text-align:center;">KAMERAADGANG KRÆVET</div>
+      <div style="font-size:11px;color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;text-align:center;margin-bottom:20px;line-height:1.8;">
+        // CORETEX KRÆVER KAMERAADGANG FOR AT LOGGE IND.<br>KLIK PÅ KNAPPEN OG TILLAD KAMERA I BROWSEREN.
+      </div>
+
+      <div id="cam-gate-status" style="font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;text-align:center;min-height:18px;margin-bottom:16px;"></div>
+
+      <button id="cam-gate-btn" onclick="camGateRequest()" style="width:100%;padding:13px;background:linear-gradient(90deg,rgba(0,30,50,0.8),rgba(0,80,120,0.5));border:1px solid var(--border-bright);border-top:1px solid var(--cortex-accent);color:var(--cortex-accent);font-family:'Rajdhani',sans-serif;font-weight:700;font-size:18px;letter-spacing:5px;text-transform:uppercase;cursor:pointer;transition:all 0.25s;">
+        ▶ AKTIVÉR KAMERA
+      </button>
+      <div id="cam-gate-denied" style="display:none;margin-top:16px;padding:12px;border:1px solid var(--red);background:rgba(255,34,34,0.06);">
+        <div style="color:var(--red);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;line-height:1.8;">
+          ⚠ KAMERAADGANG NÆGTET<br>
+          <span style="color:var(--text-dim);">Du skal tillade kamera for at bruge CORETEX.<br>
+          Klik på kamera-ikonet i adresselinjen og vælg "Tillad".</span>
+        </div>
+        <button onclick="camGateRequest()" style="margin-top:10px;padding:7px 18px;background:transparent;border:1px solid var(--red);color:var(--red);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;text-transform:uppercase;">⟳ PRØV IGEN</button>
+        <button onclick="doLogout()" style="margin-top:10px;margin-left:8px;padding:7px 18px;background:transparent;border:1px solid var(--border);color:var(--text-dim);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;text-transform:uppercase;">← LOG UD</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div id="lightbox" onclick="closeLightbox()">
+  <div id="lightbox-close" onclick="closeLightbox()">[ CLOSE ]</div>
+  <img id="lightbox-img" src="" alt="">
+</div>
+
+<!-- SITE OVERLAY (offline / maintenance) -->
+<div id="site-overlay" style="display:none;position:fixed;inset:0;z-index:9000;background:#0a0f0a;flex-direction:column;align-items:center;justify-content:center;gap:0;">
+  <!-- offline pane -->
+  <div id="overlay-offline" style="display:none;flex-direction:column;align-items:center;gap:0;text-align:center;animation:flicker 8s infinite;">
+    <div style="font-family:'VT323',monospace;font-size:80px;color:#ff2222;text-shadow:0 0 30px #ff2222,0 0 60px #ff2222;letter-spacing:6px;line-height:1;animation:glitch 2s infinite;">CONNECTION LOST</div>
+    <div style="font-size:13px;color:#660000;letter-spacing:4px;text-transform:uppercase;margin-top:10px;margin-bottom:40px;">// SIGNAL LOST — ATTEMPTING RECONNECT</div>
+    <div style="width:340px;height:6px;background:#150a0a;border:1px solid #440000;margin-bottom:14px;position:relative;overflow:hidden;">
+      <div style="height:100%;width:100%;background:linear-gradient(90deg,#660000,#ff2222,#660000);background-size:200% 100%;animation:reconnectScan 2.4s linear infinite;"></div>
+    </div>
+    <div id="overlay-offline-msg" style="font-size:12px;color:#882222;letter-spacing:3px;text-transform:uppercase;min-height:18px;"></div>
+    <div style="margin-top:48px;font-size:11px;color:#440000;letter-spacing:3px;text-transform:uppercase;">CONTACT GAME MASTER IF PROBLEM PERSISTS</div>
+    <button onclick="doLogout()" style="margin-top:20px;background:transparent;border:1px solid #440000;color:#663333;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:6px 16px;cursor:pointer;">[ DISCONNECT ]</button>
+  </div>
+  <!-- maintenance pane -->
+  <div id="overlay-maintenance" style="display:none;flex-direction:column;align-items:center;gap:0;text-align:center;animation:flicker 8s infinite;">
+    <div style="font-family:'VT323',monospace;font-size:72px;color:var(--amber);text-shadow:0 0 30px var(--amber),0 0 60px rgba(255,176,0,0.4);letter-spacing:6px;line-height:1;">SYSTEM OFFLINE</div>
+    <div style="font-size:13px;color:var(--green-dim);letter-spacing:4px;text-transform:uppercase;margin-top:10px;margin-bottom:36px;">// SCHEDULED MAINTENANCE IN PROGRESS</div>
+    <div style="border:2px solid var(--amber);padding:28px 48px;background:rgba(255,176,0,0.04);position:relative;max-width:520px;">
+      <div style="position:absolute;top:-11px;left:20px;background:#0a0f0a;padding:0 10px;font-size:11px;color:var(--amber);letter-spacing:3px;text-transform:uppercase;">// NOTICE</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:14px;color:var(--text-bright);line-height:2;letter-spacing:1px;">The Chronicle is currently undergoing<br>scheduled maintenance.<br><br>All nodes have been temporarily suspended.<br>Service will resume shortly.</div>
+    </div>
+    <div style="margin-top:36px;display:flex;align-items:center;gap:12px;">
+      <div style="width:8px;height:8px;background:var(--amber);border-radius:50%;animation:blink 1.2s step-end infinite;box-shadow:0 0 8px var(--amber);"></div>
+      <span style="font-size:12px;color:var(--text-dim);letter-spacing:3px;text-transform:uppercase;">STANDING BY — DO NOT ATTEMPT TO LOG IN</span>
+    </div>
+    <div style="margin-top:48px;font-size:11px;color:#444;letter-spacing:3px;text-transform:uppercase;">CONTACT GAME MASTER FOR UPDATES</div>
+    <button onclick="doLogout()" style="margin-top:20px;background:transparent;border:1px solid #444;color:#666;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:6px 16px;cursor:pointer;">[ DISCONNECT ]</button>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-titlebar">
+      <span>CORETEX SECURE ACCESS TERMINAL v2.4</span>
+      <div class="titlebar-dots">
+        <div class="dot red"></div>
+        <div class="dot amber"></div>
+        <div class="dot green"></div>
+      </div>
+    </div>
+    <div class="login-inner">
+      <div class="login-ascii">CORETEX</div>
+      <div class="login-sub">[ CLASSIFIED NODE — AUTHORISED ACCESS ONLY ]</div>
+      <div id="firebase-setup-notice" style="display:none;margin:12px 0;padding:12px;border:1px solid var(--amber);background:rgba(255,176,0,0.06);font-size:11px;letter-spacing:1px;line-height:1.8;color:var(--amber);text-transform:uppercase;">
+        ⚠ LOCAL MODE — state is not shared between players.<br>
+        To enable live sync: open the file, find <span style="color:var(--text-bright)">firebaseConfig</span> near the top and fill in your Firebase project values.<br>
+        <a href="https://console.firebase.google.com" target="_blank" style="color:var(--cyan);">→ console.firebase.google.com</a>
+      </div>
+      <div class="login-divider"></div>
+      <div class="login-prompt">// IDENTIFY YOURSELF</div>
+      <div class="login-input-row">
+        <span class="login-prefix">USER:&gt;</span>
+        <input class="login-input" type="text" id="login-username" placeholder="enter handle..." autocomplete="off" spellcheck="false"/>
+      </div>
+      <div class="login-input-row">
+        <span class="login-prefix">PASS:&gt;</span>
+        <input class="login-input" type="password" id="login-password" placeholder="••••••••••••"/>
+      </div>
+      <button class="login-btn" onclick="doLogin()">AUTHENTICATE</button>
+      <div class="login-error" id="login-error"></div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="brand-logo">⬡ CORETEX</div>
+      <div class="brand-info">
+        <div class="brand-name">CORETEX // SECURE NODE</div>
+        <div class="brand-status">● SYSTEM ONLINE — <span id="sys-clock"></span></div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="user-badge">
+        <div class="user-name" id="header-username">—</div>
+        <div class="user-role" id="header-role">—</div>
+      </div>
+      <button class="hdr-btn" onclick="switchTab('profile')" style="display:none" id="profile-btn">[ PROFILE ]</button>
+      <div id="sync-status" class="local" title="Klik for at skifte Solo/Sync mode" style="cursor:pointer;" onclick="toggleSoloMode()"><div id="sync-dot"></div><span id="sync-label">LOCAL</span></div>
+      <button class="hdr-btn" onclick="doLogout()">[ DISCONNECT ]</button>
+    </div>
+  </header>
+  <div class="status-bar">
+    <div class="status-item"><div class="status-dot"></div> UPLINK ACTIVE</div>
+    <div class="status-item"><div class="status-dot amber"></div> ENCRYPTION: AES-256</div>
+    <div class="status-item"><div class="status-dot"></div> <span id="online-count">1</span> NODES CONNECTED</div>
+    <div class="status-item" id="hacker-status-item" style="display:none"><div class="status-dot red"></div> <span style="color:var(--hacker)">HACKER TOOLS UNLOCKED</span></div>
+  </div>
+  <nav class="tab-bar" id="tab-bar"></nav>
+  <main id="tab-panels"></main>
+</div>
+
+</body>
+<script src="coretex-core.js" defer></script>
+<script src="coretex-panels.js" defer></script>
+<script src="coretex-hacker.js" defer></script>
+<script src="coretex-admin.js" defer></script>
+<script src="coretex-camera.js" defer></script>
+</html>
